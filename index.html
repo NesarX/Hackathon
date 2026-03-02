@@ -1,0 +1,101 @@
+index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>The Glitch Arena</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #000; color: #0ff; font-family: 'Courier New', monospace; overflow: hidden; }
+        
+        /* The Glitch Animation */
+        .glitch-effect { animation: glitch 0.2s infinite; }
+        @keyframes glitch {
+            0% { transform: translate(0); filter: hue-rotate(0deg); }
+            25% { transform: translate(-5px, 5px); filter: hue-rotate(90deg); }
+            50% { transform: translate(5px, -5px); filter: hue-rotate(180deg); }
+            75% { transform: translate(-5px, -5px); filter: hue-rotate(270deg); }
+            100% { transform: translate(0); filter: hue-rotate(360deg); }
+        }
+
+        .eye-container { border: 2px solid #0ff; box-shadow: 0 0 20px #0ff; transition: all 0.5s; }
+        #hp-bar { transition: width 1s ease-in-out; }
+    </style>
+</head>
+<body class="h-screen flex flex-col items-center justify-center space-y-8 select-none">
+
+    <div id="status" class="text-cyan-500 text-[10px] tracking-widest uppercase">Arena Online</div>
+
+    <div id="beast-box" class="eye-container w-80 h-80 rounded-full flex flex-col items-center justify-center bg-black/80 p-8">
+        <div id="avatar" class="text-7xl mb-6">👁️</div>
+        
+        <div class="w-48 bg-gray-900 h-1 mb-6 rounded-full overflow-hidden">
+            <div id="hp-bar" class="bg-cyan-400 h-full" style="width: 100%"></div>
+        </div>
+
+        <p id="speech" class="text-center text-xs text-gray-400 italic">"Speak your truth..."</p>
+    </div>
+
+    <button id="mic" class="relative group outline-none">
+        <div class="relative w-16 h-16 bg-black border-2 border-cyan-500 rounded-full flex items-center justify-center">
+            <span id="mic-icon" class="text-xl">🎤</span>
+        </div>
+    </button>
+
+    <script>
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        let finalStr = '';
+        let isListening = false;
+
+        function speak(t) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(t);
+            u.pitch = 0.7; u.rate = 0.9;
+            window.speechSynthesis.speak(u);
+        }
+
+        document.getElementById('mic').onpointerdown = (e) => {
+            e.preventDefault();
+            if (!isListening) {
+                finalStr = '';
+                recognition.start();
+                isListening = true;
+                // START GLITCH
+                document.getElementById('avatar').classList.add('glitch-effect');
+                document.getElementById('mic-icon').innerText = "🔴";
+            }
+        };
+
+        document.getElementById('mic').onpointerup = () => {
+            recognition.stop();
+            isListening = false;
+            // STOP GLITCH
+            document.getElementById('avatar').classList.remove('glitch-effect');
+            document.getElementById('mic-icon').innerText = "🎤";
+        };
+
+        recognition.onresult = (e) => {
+            finalStr = e.results[0][0].transcript;
+        };
+
+        recognition.onend = async () => {
+            if (!finalStr.trim()) return;
+            document.getElementById('status').innerText = "Processing Voice...";
+            
+            const res = await fetch(`http://localhost:8000/trigger-intervention?user_voice_text=${encodeURIComponent(finalStr)}`);
+            const data = await res.json();
+            
+            document.getElementById('speech').innerText = `"${data.reply_text}"`;
+            document.getElementById('hp-bar').style.width = data.boss_hp + "%";
+            document.getElementById('status').innerText = data.message;
+            speak(data.reply_text);
+
+            if(data.boss_hp === 0) {
+                document.getElementById('avatar').innerText = "🧘";
+                document.getElementById('beast-box').style.borderColor = "#fff";
+                document.getElementById('status').innerText = "ARENA PURIFIED";
+            }
+        };
+    </script>
+</body>
+</html>
